@@ -3,15 +3,18 @@ package sessions
 import (
 	"context"
 	"errors"
+	"github.com/labstack/echo/v4"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"log"
 	"math/rand"
+	"net/http"
+	"time"
 )
 
 type cookieSession struct {
 	Token string `bson:"token"`
-	Login string `bson:"login"`
+	ID    string `bson:"ID"`
 }
 
 var dbClient *mongo.Client
@@ -36,13 +39,13 @@ func DeleteSession(token string) (deletedCount int64, err error) {
 	}
 }
 
-func CreateSessions(login string) (string, error) {
+func CreateSessions(ID string) (string, error) {
 	token := getNewSessionToken()
-	_, err := sessionCollection.InsertOne(context.TODO(), cookieSession{token, login})
+	_, err := sessionCollection.InsertOne(context.TODO(), cookieSession{token, ID})
 	if err == nil {
-		log.Println("Create new session, login: ", login, " token: ", token)
+		log.Println("Create new session, ID: ", ID, " token: ", token)
 	} else {
-		log.Println("Error to create new session, login: ", login, " error: ", err)
+		log.Println("Error to create new session, ID: ", ID, " error: ", err)
 	}
 	return token, err
 }
@@ -51,11 +54,11 @@ func GetSession(token string) (login string, err error) {
 	var obj cookieSession
 	err = sessionCollection.FindOne(context.TODO(), bson.D{{"token", token}}).Decode(&obj)
 	if err == nil {
-		log.Println("Get session, token: ", token, " login: ", obj.Login)
+		log.Println("Get session, token: ", token, " id: ", obj.ID)
 	} else {
-		log.Println("Error to get session login: ", login, " error: ", err)
+		log.Println("Error to get session token:,", token, " error: ", err)
 	}
-	return obj.Login, err
+	return obj.ID, err
 }
 
 func getNewSessionToken() string {
@@ -65,4 +68,16 @@ func getNewSessionToken() string {
 		id += string(rand.Int31()%25 + 65)
 	}
 	return id
+}
+
+func RecreateCookie(newToken string, ctx echo.Context) *http.Cookie {
+	oldToken, err := ctx.Cookie("sessionToken")
+	if err == nil && oldToken != nil && oldToken.Value != "" {
+		_, _ = DeleteSession(oldToken.Value)
+	}
+	cookie := new(http.Cookie)
+	cookie.Name = "sessionToken"
+	cookie.Value = newToken
+	cookie.Expires = time.Now().Add(time.Hour)
+	return cookie
 }

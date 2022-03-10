@@ -19,7 +19,7 @@ import (
 func main() {
 
 	rand.Seed(time.Now().UnixMilli())
-	mongoClient := initMongoDB("79.120.10.217")
+	mongoClient := initMongoDB("127.0.0.1")
 	if err := sessions.Init(mongoClient); err != nil {
 		return
 	}
@@ -34,111 +34,105 @@ func main() {
 	e.Use(middleware.Logger())
 	e.Use(middleware.Recover())
 
-	e.GET("/:user", HandlerUser)
-	e.POST("/registration", HandlerRegistration)
-	e.POST("/authentication", HandlerAuthentication)
+	e.GET("/auth/users/:ID", HandlerUser)
+	e.POST("/auth/users", HandlerRegistration)
+	e.POST("/auth/login", HandlerAuthentication)
+	e.PUT("/auth/users/:ID", HandleUpdateUser)
 
 	e.Logger.Fatal(e.Start(":1500"))
 }
 
 func HandlerUser(ctx echo.Context) error {
-	requestLogin := ctx.Param("user")
-
+	requestID := ctx.Param("ID")
+	//Проверка токена
 	token, err := ctx.Cookie("sessionToken")
 	if err != nil || token.Value == "" {
-		return ctx.JSON(http.StatusOK, "Message: Авторизуйся, пес")
+		return ctx.JSON(http.StatusUnauthorized, "")
 	}
-	login, err := sessions.GetSession(token.Value)
+	ID, err := sessions.GetSession(token.Value)
 	if err != nil {
-		return ctx.JSON(http.StatusOK, "Message: Авторизуйся, пес")
+		return ctx.JSON(http.StatusUnauthorized, "")
 	}
-
-	userData, err := authentication.GetUserByLogin(requestLogin)
+	//Получаем данные о юзере
+	userData, err := authentication.GetUserByID(requestID)
 	if err != nil {
-		return ctx.JSON(http.StatusNotFound, "Message: Я такого не знаю, ди в хуй")
+		return ctx.JSON(http.StatusNotFound, "")
 	}
-	if login == requestLogin {
+	if ID == requestID {
 		return ctx.JSON(http.StatusOK, userData)
 	} else {
-		return ctx.JSON(http.StatusOK, "First Name: "+userData.FirstName)
+		return ctx.JSON(http.StatusOK,
+			"First Name: "+userData.FirstName+
+				"Second Name: "+userData.LastName)
 	}
 }
 
 func HandlerAuthentication(ctx echo.Context) error {
-	//Берем из тела логин
-	bodyData := make(map[string]string)
-	if err := json.NewDecoder(ctx.Request().Body).Decode(&bodyData); err != nil {
-		return ctx.JSON(http.StatusInternalServerError, "Message: can't decode body")
+	//Берем из тела логин и пароль
+	user := authentication.User{}
+	if err := json.NewDecoder(ctx.Request().Body).Decode(&user); err != nil {
+		log.Println(err)
+		return ctx.JSON(http.StatusBadRequest, "Message: can't decode body")
 	}
-	login, found := bodyData["login"]
-	if found != true {
-		return ctx.JSON(http.StatusBadRequest, "Message: no Login")
-	}
-	password, found := bodyData["password"]
-	if found != true {
-		return ctx.JSON(http.StatusBadRequest, "Message: no Login")
-	}
-
-	user := authentication.User{
-		Login:    login,
-		Password: password,
+	if user.Mail == "" || user.Password == "" {
+		return ctx.JSON(http.StatusBadRequest, "Message: no email/pass")
 	}
 
 	if _, token, err := user.Authentication(); err != nil {
 		log.Println("Registration error: ", err)
 		return ctx.JSON(http.StatusBadRequest, "Message: "+err.Error())
 	} else {
-		//удаляем старый токен,
-		oldToken, _ := ctx.Cookie("sessionToken")
-		sessions.DeleteSession(oldToken.Value)
-
-		cookie := new(http.Cookie)
-		cookie.Name = "sessionToken"
-		cookie.Value = token
-		cookie.Expires = time.Now().Add(time.Hour)
-		ctx.SetCookie(cookie)
+		ctx.SetCookie(sessions.RecreateCookie(token, ctx))
 		return ctx.JSON(http.StatusOK, "Message: "+" Вход в аккаунт выполнен!")
 	}
 }
 
 func HandlerRegistration(ctx echo.Context) error {
 	//Берем из тела логин
-	bodyData := make(map[string]string)
-	if err := json.NewDecoder(ctx.Request().Body).Decode(&bodyData); err != nil {
+	user := authentication.User{}
+	if err := json.NewDecoder(ctx.Request().Body).Decode(&user); err != nil {
+		log.Println(err)
 		return ctx.JSON(http.StatusInternalServerError, "Message: can't decode body")
 	}
-	login, found := bodyData["login"]
-	if found != true {
-		return ctx.JSON(http.StatusBadRequest, "Message: no Login")
-	}
-	password, found := bodyData["password"]
-	if found != true {
-		return ctx.JSON(http.StatusBadRequest, "Message: no Login")
-	}
 
-	user := authentication.User{
-		Login:      login,
-		Password:   password,
-		Email:      bodyData["email"],
-		FirstName:  bodyData["firstName"],
-		SecondName: bodyData["secondName"],
-		Age:        0,
-		IsAdmin:    false,
+	if user.Mail == "" || user.Password == "" {
+		return ctx.JSON(http.StatusBadRequest, "Message: no email/pass")
 	}
-
 	if token, err := user.Registration(); err != nil {
 		log.Println("Registration error: ", err)
 		return ctx.JSON(http.StatusBadRequest, "Message: "+err.Error())
 	} else {
-		oldToken, _ := ctx.Cookie("sessionToken")
-		sessions.DeleteSession(oldToken.Value)
-		cookie := new(http.Cookie)
-		cookie.Name = "sessionToken"
-		cookie.Value = token
-		cookie.Expires = time.Now().Add(time.Hour)
-		ctx.SetCookie(cookie)
+		ctx.SetCookie(sessions.RecreateCookie(token, ctx))
 		return ctx.JSON(http.StatusOK, "Message: "+"You have been register!")
 	}
+}
+
+func HandleUpdateUser(ctx echo.Context) error {
+	ID := ctx.Param("ID")
+	newUserData := authentication.User{}
+	if err := json.NewDecoder(ctx.Request().Body).Decode(&newUserData); err != nil {
+		log.Println(err)
+		return ctx.JSON(http.StatusBadRequest, "Message: can't decode body")
+	}
+
+	token, err := ctx.Cookie("sessionToken")
+	if err != nil || token.Value == "" {
+		return ctx.JSON(http.StatusUnauthorized, "")
+	}
+
+	if tokenId, err := sessions.GetSession(token.Value); err != nil {
+		return ctx.JSON(http.StatusUnauthorized, "")
+	} else {
+		//У текущего запрос отправителя есть права?
+		if tokenId == ID {
+			if err = newUserData.Update(); err == nil {
+				return ctx.JSON(http.StatusOK, "Message: successful update")
+			} else {
+				return ctx.JSON(http.StatusNotFound, "Message: "+err.Error())
+			}
+		}
+	}
+	return ctx.JSON(http.StatusBadRequest, "Message: wtf?")
 }
 
 func initMongoDB(address string) *mongo.Client {
