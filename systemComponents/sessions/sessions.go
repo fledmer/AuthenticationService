@@ -13,12 +13,14 @@ import (
 )
 
 type cookieSession struct {
-	Token string `bson:"token"`
 	ID    string `bson:"ID"`
+	Token string `bson:"token"`
 }
 
-var dbClient *mongo.Client
-var sessionCollection *mongo.Collection
+var (
+	dbClient          *mongo.Client
+	sessionCollection *mongo.Collection
+)
 
 func Init(client *mongo.Client) error {
 	if client == nil {
