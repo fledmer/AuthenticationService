@@ -3,19 +3,16 @@ package sessions
 import (
 	"context"
 	"errors"
-	"github.com/labstack/echo/v4"
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/mongo"
 	"log"
+	"main/systemComponents"
 	"math/rand"
 	"net/http"
 	"time"
-)
 
-type cookieSession struct {
-	ID    string `bson:"ID"`
-	Token string `bson:"token"`
-}
+	"github.com/labstack/echo/v4"
+	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/mongo"
+)
 
 var (
 	dbClient          *mongo.Client
@@ -43,7 +40,7 @@ func DeleteSession(token string) (deletedCount int64, err error) {
 
 func CreateSessions(ID string) (string, error) {
 	token := getNewSessionToken()
-	_, err := sessionCollection.InsertOne(context.TODO(), cookieSession{token, ID})
+	_, err := sessionCollection.InsertOne(context.TODO(), systemComponents.CookieSession{token, ID})
 	if err == nil {
 		log.Println("Create new session, ID: ", ID, " token: ", token)
 	} else {
@@ -53,7 +50,7 @@ func CreateSessions(ID string) (string, error) {
 }
 
 func GetSession(token string) (login string, err error) {
-	var obj cookieSession
+	var obj systemComponents.CookieSession
 	err = sessionCollection.FindOne(context.TODO(), bson.D{{"token", token}}).Decode(&obj)
 	if err == nil {
 		log.Println("Get session, token: ", token, " id: ", obj.ID)

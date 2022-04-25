@@ -2,12 +2,13 @@ package handlers
 
 import (
 	"encoding/json"
-	"github.com/labstack/echo/v4"
 	"log"
 	"main/systemComponents/deeds"
 	"main/systemComponents/sessions"
 	"main/systemComponents/users"
 	"net/http"
+
+	"github.com/labstack/echo/v4"
 )
 
 func GetUser(ctx echo.Context) error {
@@ -100,6 +101,17 @@ func UpdateUser(ctx echo.Context) error {
 		}
 	}
 	return ctx.JSON(http.StatusBadRequest, "Message: wtf?")
+}
+
+func VerifiedUser(ctx echo.Context) error {
+	ID := ctx.Param("ID")
+	if user, err := users.GetUserByID(ID); err != nil {
+		return ctx.JSON(http.StatusBadRequest, "Message: "+err.Error())
+	} else {
+		user.Verified = true
+		user.Update()
+		return ctx.JSON(http.StatusOK, "")
+	}
 }
 
 func GetDeedByID(ctx echo.Context) error {
