@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"log"
 	"main/systemComponents/deeds"
+	"main/systemComponents/images"
 	"main/systemComponents/sessions"
 	"main/systemComponents/users"
 	"net/http"
@@ -154,5 +155,39 @@ func CreateDeed(ctx echo.Context) error {
 		return ctx.JSON(http.StatusInternalServerError, "Error: "+err.Error())
 	} else {
 		return ctx.JSON(http.StatusOK, "Message: Deed has been registered")
+	}
+}
+
+func AddImage(ctx echo.Context) error {
+	newImages := images.Images{}
+	if err := json.NewDecoder(ctx.Request().Body).Decode(&newImages); err != nil {
+		log.Println(err)
+		return ctx.JSON(http.StatusBadRequest, "Message: can't decode body")
+	}
+	if err := newImages.AddNew(); err != nil {
+		log.Println(err)
+		return ctx.JSON(http.StatusInternalServerError, "Error: "+err.Error())
+	} else {
+		return ctx.JSON(http.StatusOK, "Message: image has been registered")
+	}
+}
+
+func GetImageByID(ctx echo.Context) error {
+	ID := ctx.Param("ID")
+
+	if image, err := images.GetByID(ID); err != nil {
+		return ctx.JSON(http.StatusNotFound, "")
+	} else {
+		return ctx.JSON(http.StatusOK, image)
+	}
+}
+
+func DeleteImageByID(ctx echo.Context) error {
+	ID := ctx.Param("ID")
+
+	if err := images.DeleteByID(ID); err != nil {
+		return ctx.JSON(http.StatusNotFound, "")
+	} else {
+		return ctx.JSON(http.StatusOK, "")
 	}
 }

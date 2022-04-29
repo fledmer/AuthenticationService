@@ -3,17 +3,19 @@ package main
 import (
 	"context"
 	"fmt"
-	"github.com/labstack/echo/v4"
-	"github.com/labstack/echo/v4/middleware"
-	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
 	"log"
 	"main/handlers"
 	"main/systemComponents/deeds"
+	"main/systemComponents/images"
 	"main/systemComponents/sessions"
 	"main/systemComponents/users"
 	"math/rand"
 	"time"
+
+	"github.com/labstack/echo/v4"
+	"github.com/labstack/echo/v4/middleware"
+	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 func main() {
@@ -31,6 +33,7 @@ func main() {
 	if err := deeds.Init(mongoClient); err != nil {
 		return
 	}
+	images.Init(mongoClient)
 	log.Println("Authentication module init")
 
 	e := echo.New()
@@ -42,6 +45,10 @@ func main() {
 	e.POST("/auth/users", handlers.RegistrateUser)
 	e.POST("/auth/login", handlers.AuthenticateUser)
 	e.PUT("/auth/users/:ID", handlers.UpdateUser)
+	e.POST("/auth/verified/:ID", handlers.VerifiedUser)
+	e.POST("/images", handlers.AddImage)
+	e.DELETE("/images/:ID", handlers.DeleteImageByID)
+	e.GET("/images/:ID", handlers.GetImageByID)
 	e.GET("/deeds/:ID", handlers.GetDeedByID)
 	e.GET("/deeds/user/:ID", handlers.GetDeedByUser)
 	e.GET("/deeds", handlers.GetAllDeed)
