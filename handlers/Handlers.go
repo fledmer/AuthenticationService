@@ -16,7 +16,12 @@ func GetUser(ctx echo.Context) error {
 	requestID := ctx.Param("ID")
 	//Проверка токена
 	token, err := ctx.Cookie("sessionToken")
-	ID, err := sessions.GetSession(token.Value)
+	var ID string
+	if token != nil {
+		ID, _ = sessions.GetSession(token.Value)
+	} else {
+		ID = ""
+	}
 	//Получаем данные о юзере
 	userData, err := users.GetUserByID(requestID)
 	if err != nil {
