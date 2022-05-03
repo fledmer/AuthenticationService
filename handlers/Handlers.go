@@ -16,13 +16,7 @@ func GetUser(ctx echo.Context) error {
 	requestID := ctx.Param("ID")
 	//Проверка токена
 	token, err := ctx.Cookie("sessionToken")
-	if err != nil || token.Value == "" {
-		return ctx.JSON(http.StatusUnauthorized, "")
-	}
 	ID, err := sessions.GetSession(token.Value)
-	if err != nil {
-		return ctx.JSON(http.StatusUnauthorized, "")
-	}
 	//Получаем данные о юзере
 	userData, err := users.GetUserByID(requestID)
 	if err != nil {
